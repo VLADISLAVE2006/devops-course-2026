@@ -21,5 +21,5 @@ install -m 644 "$ROOT/config/devops-site" /etc/nginx/sites-available/devops-site
 ln -sfn /etc/nginx/sites-available/devops-site /etc/nginx/sites-enabled/devops-site
 if [[ -L /etc/nginx/sites-enabled/default ]]; then unlink /etc/nginx/sites-enabled/default; fi
 nginx -t
-systemctl enable nginx
+systemctl enable --now nginx
 systemctl reload nginx

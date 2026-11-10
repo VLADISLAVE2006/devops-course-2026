@@ -10,11 +10,17 @@ case "${1:-}" in
 esac
 [[ -f "$ROOT/site/index.html" ]] || { echo 'site/index.html is missing' >&2; exit 1; }
 [[ -z "$(git status --porcelain)" ]] || { echo 'Commit changes before deploying' >&2; exit 1; }
-rsync -avz --delete --chmod=D755,F644 "${DRY[@]}" \
+if ! rsync -avz --delete --chmod=D755,F644 "${DRY[@]}" \
     -e 'ssh -o BatchMode=yes -o ConnectTimeout=5' \
-    "$ROOT/site/" devops:/var/www/devops-site/
+    "$ROOT/site/" devops:/var/www/devops-site/; then
+    echo 'File delivery failed' >&2
+    exit 1
+fi
 if [[ ${#DRY[@]} -eq 0 ]]; then
-    curl --fail --silent --show-error --connect-timeout 5 --max-time 15 \
-        --cacert "${HOME}/devops.crt" https://devops.local/ >/dev/null
+    if ! curl --fail --silent --show-error --connect-timeout 5 --max-time 15 \
+        --cacert "${HOME}/devops.crt" https://devops.local/ >/dev/null; then
+        echo 'Resource availability check failed' >&2
+        exit 1
+    fi
 fi
 printf 'Commit: %s\n' "$(git rev-parse --short HEAD)"

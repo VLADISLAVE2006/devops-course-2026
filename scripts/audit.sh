@@ -2,7 +2,7 @@
 set -uo pipefail
 export LC_ALL=C
 PASS=0; FAIL=0
-STAGE="${1:-6}"
+STAGE="${1:-7}"
 case "$STAGE" in 5|6|7|8) ;; *) echo 'Usage: audit.sh [5|6|7|8]' >&2; exit 1;; esac
 check() {
     local desc="$1" expected="$2" actual="$3"

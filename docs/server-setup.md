@@ -154,3 +154,34 @@ curl --cacert ~/devops.crt -I https://devops.local/
 ```
 
 Перед деплоем изменения должны быть зафиксированы в Git. На Windows сценарий выполняется из WSL, где настроены собственные SSH-псевдоним, ключ и запись `/etc/hosts`. Диагностика: `/var/log/nginx/devops-site.access.log`, `/var/log/nginx/devops-site.error.log`, `namei -l /var/www/devops-site/index.html`. После фактической проверки создаётся снимок `04-nginx-https`.
+
+## 9. Контейнеризация
+
+Docker Engine и плагин Compose устанавливаются из официального APT-репозитория Docker сценарием `sudo bash scripts/install-docker.sh`. На проверенном стенде установлены Docker Engine 29.10.0, Compose v5.7.1 и containerd v2.4.2; версии подтверждены командами `docker version` и `docker compose version`. Пользователь `devops` добавлен в группу `docker` (GID 988); членство подтверждено в новой SSH-сессии. Эта группа предоставляет возможности, эквивалентные root.
+
+Исходники приложения находятся в `app/`, рабочий каталог на сервере — `/home/devops/app`. При доставке `.env` обязательно исключается из rsync, включая удаление через `--delete`. На сервере от имени devops файл создаётся сценарием `scripts/prepare-app-env.sh` до первого запуска. По умолчанию сценарий использует `~/app`, первый аргумент позволяет явно задать рабочий каталог. Владелец файла — devops, права — 600; действующий пароль не копируется на хост и не попадает в Git или образ.
+
+```bash
+# На хосте из корня репозитория:
+rsync -avz --delete --exclude=.env --dry-run app/ devops:app/
+rsync -avz --delete --exclude=.env app/ devops:app/
+# На VM из копии репозитория:
+bash scripts/prepare-app-env.sh /home/devops/app
+cd ~/app
+docker compose up -d --build
+docker compose ps
+```
+
+Compose создаёт сервисы `app` и `db` в сети `app_backend`. Приложение работает от пользователя app, слушает `0.0.0.0:5000` внутри контейнера и публикуется как `127.0.0.1:5000:5000`. PostgreSQL 16 Alpine доступен по имени `db`, его порт 5432 на хост не публикуется. Именованный том `app_db_data` хранит данные в `/var/lib/postgresql/data`. Запуск приложения ожидает готовности БД; оба сервиса имеют политику `unless-stopped`.
+
+Nginx обслуживает `https://devops.local/app/` через `proxy_pass http://127.0.0.1:5000/`, удаляя префикс `/app/`. Передаются Host, X-Real-IP, X-Forwarded-For и X-Forwarded-Proto. Статический ресурс `/` сохраняется. Проверки:
+
+```bash
+curl --cacert ~/devops.crt https://devops.local/app/
+curl --cacert ~/devops.crt -I https://devops.local/
+docker compose --project-directory ~/app port app 5000
+docker compose --project-directory ~/app port db 5432
+~/devops-course-2026/scripts/audit.sh 7
+```
+
+`docker compose down` сохраняет том; `down -v` уничтожает его данные и применяется только к учебному набору при отдельном опыте ПР №7. После проверки создаётся снимок `05-docker-compose`. Перед контрольной нужен снимок `06-before-kr2`, после её завершения — `07-kr2`; существование снимков подтверждается выводом VirtualBox, а не этим описанием.

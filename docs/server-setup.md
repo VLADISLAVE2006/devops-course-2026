@@ -122,3 +122,35 @@ echo $?
 | `03-ssh-hardened` | Эффективные параметры SSH и вход на новом порту проверены |
 
 При восстановлении снимка измените проброс портов в соответствии с конфигурацией SSH этого снимка. Наличие и имена реальных снимков проверяются в VirtualBox; одна эта таблица их создания не подтверждает.
+
+## 8. Веб-сервер
+
+Пакеты `nginx` и `rsync` устанавливаются из репозитория Ubuntu. Конфигурация ресурса хранится в `config/devops-site` и устанавливается в `/etc/nginx/sites-available/devops-site`; активация выполняется ссылкой `/etc/nginx/sites-enabled/devops-site`. Стандартная ссылка `default` отключается. Каталог `/var/www/devops-site` принадлежит `devops:devops`, каталоги имеют права 755, файлы — 644. Пользователь рабочих процессов `www-data` читает файлы, но не изменяет их.
+
+Самоподписанный сертификат `/etc/ssl/certs/devops.crt` содержит SAN `DNS:devops.local`, действует 365 дней и имеет права 644. Закрытый ключ `/etc/ssl/private/devops.key` принадлежит root и имеет права 600. Команда создания:
+
+```bash
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout /etc/ssl/private/devops.key \
+  -out /etc/ssl/certs/devops.crt \
+  -subj '/CN=devops.local' -addext 'subjectAltName=DNS:devops.local'
+```
+
+Восстановление итоговой конфигурации из репозитория:
+
+```bash
+sudo bash scripts/install-nginx.sh
+sudo nginx -t
+scripts/audit.sh 6
+```
+
+Сервер перенаправляет HTTP на HTTPS с кодом 301. HSTS не включается. После изменения конфигурации выполняются `sudo nginx -t && sudo systemctl reload nginx`. Для доставки сайта на хосте выполняются:
+
+```bash
+scp devops:/etc/ssl/certs/devops.crt ~/devops.crt
+scripts/deploy.sh --dry-run
+scripts/deploy.sh
+curl --cacert ~/devops.crt -I https://devops.local/
+```
+
+Перед деплоем изменения должны быть зафиксированы в Git. На Windows сценарий выполняется из WSL, где настроены собственные SSH-псевдоним, ключ и запись `/etc/hosts`. Диагностика: `/var/log/nginx/devops-site.access.log`, `/var/log/nginx/devops-site.error.log`, `namei -l /var/www/devops-site/index.html`. После фактической проверки создаётся снимок `04-nginx-https`.

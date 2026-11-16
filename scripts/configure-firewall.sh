@@ -11,5 +11,9 @@ ufw --force enable
 ufw logging medium
 ufw status verbose
 hostnamectl set-hostname devops-vm
-sed -i 's/^127\.0\.1\.1.*/127.0.1.1 devops-vm.devops.local devops-vm/' /etc/hosts
+if grep -qE '^127\.0\.1\.1[[:space:]]' /etc/hosts; then
+    sed -i 's/^127\.0\.1\.1.*/127.0.1.1 devops-vm.devops.local devops-vm/' /etc/hosts
+else
+    printf '\n127.0.1.1 devops-vm.devops.local devops-vm\n' >> /etc/hosts
+fi
 hostname -f

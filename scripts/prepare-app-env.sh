@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../app"
+cd -- "${1:-$HOME/app}"
 if [[ -e .env ]]; then echo '.env exists; preserved'; exit 0; fi
 umask 077
 set -o noclobber
